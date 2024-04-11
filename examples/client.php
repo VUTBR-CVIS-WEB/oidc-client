@@ -15,11 +15,14 @@ $provider = new \Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectPro
 	[
 		'clientId' => 'a57574b2-b7b2-4962-ad77-b908874691cc',
 		'clientSecret' => 'abc123',
+		'clientId' => '4c944b57-f951-47ea-88e6-b3d447feb29b',
+		'clientSecret' => 'abc123',
 		// Your server
-		//'redirectUri' => 'http://localhost:8001/client.php',
-		'redirectUri' => 'https://www.localhost/common/test/default',
+		'redirectUri' => 'http://localhost:8002/client.php',
+		//'redirectUri' => 'https://www.localhost/common/test/default',
 		'scopes' => [
 			'openid',
+			'profile',
 		],
 
 		// Settings of the OP (OpenID Provider)
@@ -66,7 +69,43 @@ if (isset($_GET['code']) && isset($_SESSION['OAuth2.state']) && isset($_GET['sta
 			'All Claims: ' . print_r($token->getIdToken()->claims(), true),
 		];
 
-		echo implode('<br />', $response);
+		echo implode('<br />', $response) . "<br>";
+
+		$redirectUrl = $provider->getLogoutUrl();
+		echo 'Logout URL: ';
+		echo '<a href="' . $redirectUrl . '">' . $redirectUrl . '</a><br/>';
+
+		try {
+			$newAccessToken = $provider->getAccessToken('refresh_token', [
+				'refresh_token' => $token->getRefreshToken()
+			]);
+
+			echo "Refreshed access token: " . $newAccessToken->getToken() . "<br>";
+			echo "Refreshed refresh token: " . $newAccessToken->getRefreshToken() . "<br>";
+		} catch (\Exception $e) {
+			var_dump($e);
+		}
+
+		if ($newAccessToken) {
+
+			echo "<br>Revoke access token<br>";
+			try {
+				$response = $provider->revokeAccessToken($newAccessToken->getToken());
+				echo "<pre>" . var_dump($response) . "</pre>";
+			} catch (\Exception $exception) {
+				echo "<pre>" . var_dump($exception) . "</pre>";
+			}
+
+			echo "<br>Revoke refresh token<br>";
+			try {
+				$response = $provider->revokeAccessToken($newAccessToken->getRefreshToken());
+				echo "<pre>" . var_dump($response) . "</pre>";
+			} catch (\Exception $exception) {
+				echo "<pre>" . var_dump($exception) . "</pre>";
+			}
+		}
+
+		return;
 	} else {
 		//unset($_SESSION['OAuth2.state']);
 		//unset($_SESSION['OAuth2.nonce']);

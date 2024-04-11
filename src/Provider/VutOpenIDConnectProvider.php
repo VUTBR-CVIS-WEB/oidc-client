@@ -123,7 +123,7 @@ class VutOpenIDConnectProvider extends VutProvider
 	public function getAccessToken($grant, array $options = [])
 	{
 		$accessToken = parent::getAccessToken($grant, $options);
-		if ((string)$grant == 'refresh_grant') {
+		if ((string)$grant == 'refresh_token') {
 			return $accessToken;
 		}
 
@@ -214,14 +214,7 @@ class VutOpenIDConnectProvider extends VutProvider
 		$options = parent::getAuthorizationParameters($options);
 
 		$this->nonce = $this->getRandomNonce();
-		$options['nonce'] = trim(
-			strtr(
-				base64_encode(hash('sha256', $this->nonce, true)),
-				'+/',
-				'-_'
-			),
-			'='
-		);
+		$options['nonce'] = $this->nonce;
 
 		return $options;
 	}
@@ -322,8 +315,9 @@ class VutOpenIDConnectProvider extends VutProvider
 		}
 
 		// Validate scopes
-		if (isset($response["scopes_supported"])) {
-			$scopesSupported = $response["scopes_supported"];
+		/* todo: fix openid-configuration to show all possible scopes
+		if (isset($response['scopes_supported'])) {
+			$scopesSupported = $response['scopes_supported'];
 			foreach ($options['scopes'] as $scope) {
 				if (!in_array($scope, $scopesSupported, true)) {
 					throw new InvalidConfigurationException(
@@ -332,6 +326,7 @@ class VutOpenIDConnectProvider extends VutProvider
 				}
 			}
 		}
+		*/
 
 		// Set public key
 		if (!isset($response["jwks_uri"])) {
@@ -349,7 +344,7 @@ class VutOpenIDConnectProvider extends VutProvider
 		if (!$cachedResponse || !$cachedResponse->isHit()) {
 			$jwksRequest = $this->getRequest(self::METHOD_GET, $jwksUri);
 			$jwksResponse = $this->getParsedResponse($jwksRequest);
-			if (is_array($jwksResponse) === false || is_array($jwksResponse['keys']) === false) {
+			if (is_array($jwksResponse) === false || is_array($jwksResponse['keys'] ?? null) === false) {
 				throw new InvalidConfigurationException(
 					'Invalid response received from discovery. Expected JSON.'
 				);

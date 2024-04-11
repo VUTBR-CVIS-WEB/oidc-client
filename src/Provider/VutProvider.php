@@ -2,11 +2,13 @@
 
 namespace Vut2\Component\OpenIDConnectClient\Provider;
 
+use GuzzleHttp\Exception\BadResponseException;
 use League\OAuth2\Client\Provider\AbstractProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use League\OAuth2\Client\Provider\GenericProvider;
 use League\OAuth2\Client\Token\AccessToken;
 use League\OAuth2\Client\Tool\BearerAuthorizationTrait;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 class VutProvider extends GenericProvider
@@ -74,9 +76,9 @@ class VutProvider extends GenericProvider
 	 *
 	 * @param string $token
 	 * @param string|null $tokenTypeHint
-	 * @return \Psr\Http\Message\RequestInterface
+	 * @return \Psr\Http\Message\ResponseInterface
 	 */
-	public function revokeAccessToken(string $token, $tokenTypeHint = null)
+	public function revokeAccessToken(string $token, string $tokenTypeHint = null): ResponseInterface
 	{
 		$params = [
 			'client_id' => $this->clientId,
@@ -94,7 +96,7 @@ class VutProvider extends GenericProvider
 		$options = $this->optionProvider->getAccessTokenOptions($this->getAccessTokenMethod(), $params);
 		$request = $this->getRequest($method, $url, $options);
 
-		return $this->getParsedResponse($request);
+		return $this->getRevokeResponse($request);
 	}
 
 	/**
@@ -163,5 +165,28 @@ class VutProvider extends GenericProvider
 		$user = new VutUser($response);
 
 		return $user;
+	}
+
+
+	/**
+	 * Sends a request and returns the parsed response.
+	 *
+	 * @param  RequestInterface $request
+	 * @return ResponseInterface
+	 * @throws IdentityProviderException
+	 */
+	public function getRevokeResponse(RequestInterface $request): ResponseInterface
+	{
+		try {
+			$response = $this->getResponse($request);
+		} catch (BadResponseException $e) {
+			$response = $e->getResponse();
+		}
+
+		if ($response->getStatusCode() != 200) {
+			throw new IdentityProviderException('Invalid status code', $response->getStatusCode(), $response->getBody());
+		}
+
+		return $response;
 	}
 }
