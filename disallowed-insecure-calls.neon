@@ -1,0 +1,13 @@
+parameters:
+	disallowedFunctionCalls:
+		-
+			function: 'bdump()'
+		-
+			function: 'dd()'
+		-
+			function: 'var_dump()'  # `method` is an alias of `function`
+		-
+			function: 'print_r()'
+	disallowedStaticCalls:
+		-
+			method: 'Tracy\Debugger::barDump()'

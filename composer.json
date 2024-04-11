@@ -1,0 +1,52 @@
+{
+  "name": "vutbr-cvis-web/oidc-client",
+  "type": "library",
+  "description": "OIDC client for VUT Auth Provider",
+  "minimum-stability": "stable",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Pavel Witassek",
+      "email": "pavel.witassek@vut.cz"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Vut2\\Component\\OpenIDConnectClient\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Vut2\\Component\\OpenIDConnectClient\\Examples\\": "examples/",
+      "Vut2\\Component\\OpenIDConnectClient\\Test\\": "tests/"
+    }
+  },
+  "require": {
+    "php": ">= 7.4",
+    "lcobucci/jwt": "~4.0|^5.2",
+    "phpseclib/phpseclib": "^3.0",
+    "league/oauth2-client": "^2.0",
+    "psr/cache": "^1.0|^3.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9",
+    "phpstan/phpstan": "^1.8",
+    "roave/security-advisories": "dev-latest",
+    "spaze/phpstan-disallowed-calls": "^2.9",
+    "phpstan/phpstan-deprecation-rules": "^1.0"
+  },
+  "scripts": {
+    "phpstan": "vendor/bin/phpstan --memory-limit=512M -vvv --ansi analyse --configuration phpstan.neon",
+    "phpunit": "php vendor/bin/phpunit --log-junit phpunit-report.xml",
+    "test": [
+      "composer audit",
+      "@phpstan",
+      "@phpunit"
+    ]
+  },
+  "config": {
+    "platform": {
+      "php": "7.4.0"
+    }
+  }
+}
