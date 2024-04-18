@@ -107,13 +107,26 @@ class VutProvider extends GenericProvider
 	 */
 	public function getLogoutUrl(array $params = [])
 	{
-		$logoutUri = $this->urlEndSession;
-
-		if (!empty($post_logout_redirect_uri['post_logout_redirect_uri'])) {
-			$logoutUri .= '?post_logout_redirect_uri=' . rawurlencode($post_logout_redirect_uri['post_logout_redirect_uri']);
+		if (!$this->urlEndSession) {
+			throw new \InvalidArgumentException('Missing end session url');
 		}
 
-		return $logoutUri;
+		$urlParts = parse_url($this->urlEndSession);
+		if (isset($urlParts['query'])) { // Avoid 'Undefined index: query'
+			parse_str($urlParts['query'], $query);
+		} else {
+			$query = [];
+		}
+		$query['client_id'] = $this->clientId;
+
+		if (!empty($params['post_logout_redirect_uri'])) {
+			$query['post_logout_redirect_uri'] = $params['post_logout_redirect_uri'];
+		}
+
+		// Note that this will url_encode all values
+		$urlParts['query'] = http_build_query($query);
+
+		return $urlParts['scheme'] . '://' . $urlParts['host'] . (($urlParts['port'] ?? false) ? (':' . $urlParts['host']) : '') . $urlParts['path'] . '?' . $urlParts['query'];
 	}
 
 	/**

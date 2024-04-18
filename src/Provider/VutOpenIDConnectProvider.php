@@ -19,6 +19,7 @@ use Lcobucci\JWT\Validation\Validator;
 use League\OAuth2\Client\Grant\AbstractGrant;
 use League\OAuth2\Client\Grant\RefreshToken;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
+use League\OAuth2\Client\Token\AccessToken;
 use League\OAuth2\Client\Token\AccessTokenInterface;
 use League\OAuth2\Client\Tool\RequestFactory;
 use Psr\Cache\CacheItemPoolInterface;
@@ -237,6 +238,19 @@ class VutOpenIDConnectProvider extends VutProvider
 
 		return new IdToken($response);
 	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function getResourceOwner(AccessToken $token)
+	{
+		if ($token instanceof IdToken) {
+			return $this->createResourceOwner($token->getIdToken()->claims()->all(), $token);
+		}
+
+		return parent::getResourceOwner($token);
+	}
+
 
 	/**
 	 * Retrieves OpenID Connect configuration from a discovery endpoint
