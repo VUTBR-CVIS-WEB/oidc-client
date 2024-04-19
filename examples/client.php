@@ -13,8 +13,6 @@ $key = sprintf('file://%s/public.key', realpath(__DIR__));
 $signer = new \Lcobucci\JWT\Signer\Rsa\Sha256();
 $provider = new \Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectProvider(
 	[
-		'clientId' => 'a57574b2-b7b2-4962-ad77-b908874691cc',
-		'clientSecret' => 'abc123',
 		'clientId' => '4c944b57-f951-47ea-88e6-b3d447feb29b',
 		'clientSecret' => 'abc123',
 		// Your server
@@ -70,6 +68,8 @@ if (isset($_GET['code']) && isset($_SESSION['OAuth2.state']) && isset($_GET['sta
 		];
 
 		echo implode('<br />', $response) . "<br>";
+
+		echo 'User: ' . var_dump($provider->getResourceOwner($token)) . '<br>';
 
 		$redirectUrl = $provider->getLogoutUrl();
 		echo 'Logout URL: ';
