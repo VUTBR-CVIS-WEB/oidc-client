@@ -1,0 +1,22 @@
+name: PHP Composer
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    strategy:
+      matrix:
+        php-version:
+          - "7.4"
+          - "8.2"
+          - "8.3"
+    uses: VUTBR-CVIS-WEB/github-actions/.github/workflows/php.yml@main
+    with:
+      php: ${{ matrix.php-version }}
