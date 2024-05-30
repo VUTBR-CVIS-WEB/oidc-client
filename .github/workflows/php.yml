@@ -49,7 +49,6 @@ jobs:
 
   phpunit:
     name: phpunit checks
-    needs: ["build"]
     runs-on: ubuntu-20.04
     steps:
       - name: OS info
