@@ -48,6 +48,12 @@ jobs:
       - run: composer phpstan
 
   phpunit:
+    strategy:
+      matrix:
+        php:
+          - "7.4"
+          - "8.2"
+          - "8.3"
     name: phpunit checks
     runs-on: ubuntu-20.04
     steps:
