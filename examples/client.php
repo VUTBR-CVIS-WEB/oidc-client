@@ -35,7 +35,7 @@ $provider = new \Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectPro
 	],
 	[
 		'signer' => $signer,
-		'http_client' => new GuzzleHttp\Client(),
+		'httpClient' => new GuzzleHttp\Client(),
 	],
 );
 
