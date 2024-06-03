@@ -1,4 +1,4 @@
-name: PHP Composer
+name: PHP Tests
 
 on:
   push:
@@ -10,13 +10,71 @@ permissions:
   contents: read
 
 jobs:
-  php:
+  phpstan:
     strategy:
       matrix:
-        php-version:
+        php:
           - "7.4"
           - "8.2"
           - "8.3"
-    uses: VUTBR-CVIS-WEB/github-actions/.github/workflows/php.yml@main
-    with:
-      php: ${{ matrix.php-version }}
+    name: phpstan checks
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: OS info
+        run: cat /etc/os-release
+      - run: sudo update-alternatives --set php /usr/bin/php${{ matrix.php }}
+      - name: PHP info
+        run: |
+          php -v
+            php -m
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php${{ matrix.php }}-
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+      - name: Get PHPStan result cache directory
+        id: phpstan-cache
+        run: echo "dir=$(php -r "echo sys_get_temp_dir() . '/phpstan';")" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.phpstan-cache.outputs.dir }}
+          key: phpstan-cache-php${{ matrix.php }}
+      - run: composer phpstan
+
+  phpunit:
+    strategy:
+      matrix:
+        php:
+          - "7.4"
+          - "8.2"
+          - "8.3"
+    name: phpunit checks
+    runs-on: ubuntu-20.04
+    steps:
+      - name: OS info
+        run: cat /etc/os-release
+      - run: sudo update-alternatives --set php /usr/bin/php${{ matrix.php }}
+      - name: PHP info
+        run: |
+          php -v
+          php -m
+      - uses: actions/checkout@v4
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php${{ matrix.php }}-
+      - name: Install dependencies
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: composer install --prefer-dist --no-progress
+      - run: composer phpunit

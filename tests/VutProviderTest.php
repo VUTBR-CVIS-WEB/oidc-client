@@ -6,45 +6,88 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
+use Lcobucci\JWT\Signer;
+use Lcobucci\JWT\Signer\Key;
+use Lcobucci\JWT\Token;
+use Lcobucci\JWT\Token\RegisteredClaims;
+use League\OAuth2\Client\Grant\AbstractGrant;
+use League\OAuth2\Client\Grant\GrantFactory;
+use League\OAuth2\Client\OptionProvider\PostAuthOptionProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use League\OAuth2\Client\Provider\ResourceOwnerInterface;
 use League\OAuth2\Client\Token\AccessToken;
+use League\OAuth2\Client\Tool\RequestFactory;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\ResponseInterface;
+use Vut2\Component\OpenIDConnectClient\Exception\InvalidTokenException;
 use Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectProvider;
 
 class VutProviderTest extends TestCase
 {
+	/**
+	 * {
+	 * "jti": "some jti",
+	 * "iss": "https://server.example.com",
+	 * "sub": "some subject",
+	 * "aud": "some audience",
+	 * "nonce": "some nonce",
+	 * "exp": 1636070123,
+	 * "iat": 1636069000,
+	 * "name": "Jane Doe",
+	 * "email": "janedoe@example.com"
+	 * }
+	 */
+	// phpcs:ignore Generic.Files.LineLength.TooLong
+	private const ID_TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImRjNWNkNDIxNWQ2NjYxYWMyODFiNDg5YjJhNWFiYjMzMTAxMGY2OTBmZmI4Y2ExNjBmZThlMDk1MDZjODU5MTUifQ.eyJhdWQiOiI0Yzk0NGI1Ny1mOTUxLTQ3ZWEtODhlNi1iM2Q0NDdmZWIyOWIiLCJpYXQiOjE3MTc0MTYyNjQsIm5iZiI6MTcxNzQxNjI2NCwiZXhwIjoxNzE3NDE5ODYzLCJzdWIiOiIxOTYyMzMiLCJpc3MiOiJodHRwczovL2hvdGRvZ2hvdXNlMjQuY2lzLnZ1dC5jei9hdXRoLXNlcnZlciIsInNpZCI6IjhiMjAyNWI4ZGMzYmE3MzFjZTQxMjJlMWU0YmNjMWY3NTNiYjQzZDFhNjNiYmM1YWYyNTU0MzEyZDJkMGI5ODAtNTc4IiwibmFtZSI6IkluZy4gUGF2ZWwgV2l0YXNzZWsiLCJmYW1pbHlfbmFtZSI6IldpdGFzc2VrIiwiZ2l2ZW5fbmFtZSI6IlBhdmVsIiwibWlkZGxlX25hbWUiOm51bGwsInByb2ZpbGUiOiJodHRwczovL3d3dy52dXQuY3ovbGlkZS8xOTYyMzMiLCJ3ZWJzaXRlIjpudWxsLCJnZW5kZXIiOiJtYWxlIiwiYmlydGhkYXRlIjoiMTk5NS0xMC0wNSIsImxvY2FsZSI6ImNzLUNaIiwidXBkYXRlZF9hdCI6MTY5Nzc2NjM1MSwiYXV0aF90aW1lIjoxNzE3NDE2MjYyLCJub25jZSI6IlZ0ak50R0NEWWlYSDJ3eTM3UUI5bHFMRk9iUk8wM2JvWmxIN0lHbkVhMGx4M3hLbVU0UjBkSXJpT0JWWlNCNWwiLCJqdGkiOiIzNjdlYzVhZWI2ODMyZGUwMzI2OGRjNjU4ZjQ2N2E4Njg4NGUxMTYwNTliNDc4YzMwYjU0OWM2MTkyZmFkNDk1YmYzMWE4ZWQ2MDM0ZmU2MSJ9.KQMC79Y7GVwoR9SrSEi4GB3Ojc2JgW7BA2K22_1BEG9hzuxhxKrL70bBtC1gj1e-7aZwwqPyKIJ9sen5xYmgzAN7Q8dcxq2xegDxzZhO9WJptzqt9R4Ii74dxEdi-0X7kQzfvydCbB6WejUPsjAHyF9QzxP_jw2ZpLEO7GHAOxU4AWv6xXtT1PhI6z3NTDjcm0R3le4kWFOtc4GiSmW4UvABB-rAUAkVh9uxfYSxM4pPqSMY9iyCuYpXEhuuXGMOU94XtJyEifKiWCnPvdl17y9Dxx8AtYyBsE5YCLGEl5RykuFz1SS_el-lQmv326YLyhCqzwPKmp1gEBlxS_F0tQ';
+
 	/** @var VutOpenIDConnectProvider */
 	protected $provider;
+	/**
+	 * @var GrantFactory
+	 */
+	private $grantFactory;
+	/**
+	 * @var Signer|(Signer&object&MockObject)|(Signer&MockObject)|(object&MockObject)|MockObject
+	 */
+	private $signer;
 
 	protected function setUp(): void
 	{
+		$this->grantFactory = $this->createMock(GrantFactory::class);
+		$this->requestFactory = $this->createMock(RequestFactory::class);
+		//$this->httpClient = $this->createMock(HttpClient::class);
+		$this->optionProvider = $this->createMock(PostAuthOptionProvider::class);
+
 		// Create a mock handler and add the mock response
 		$mockHandler = new MockHandler([
-			new Response(200, [], '{"issuer":"https://test.id.vut.cz/auth","authorization_endpoint":"https://test.id.vut.cz/auth/oauth2/authorize","token_endpoint":"https://test.id.vut.cz/auth/oauth2/token","userinfo_endpoint":"https://test.id.vut.cz/auth/oidc/userinfo","jwks_uri":"https://test.id.vut.cz/auth/.well-known/jwks.json","response_types_supported":["code"],"id_token_signing_alg_values_supported":["RS256"],"subject_types_supported":["pairwise"],"end_session_endpoint":"https://test.id.vut.cz/auth/oauth2/endSession","scopes_supported":["openid","profile","email"],"grant_types_supported":["authorization_code","refresh_token"],"frontchannel_logout_supported":true,"revocation_endpoint":"https://test.id.vut.cz/auth/common/oauth2/revoke"}'),
-			new Response(200, [], '{"keys":[{"alg":"RS256","kty":"RSA","kid":"20cce57672f33e503f297dcbd91a38953bf7463c48a9b55eaa7d4b2d478459d2","use":"sig","n":"urSjGq2WvJxRvwY9cYDzo0M3lp7WDE_TyHzahK3bFhbfSG-jI8zCbn1SEMpUVr561-24TZSM8NuqspMFlZ0NTE9RrknFXdNrlI9MtqL_Bmp2cgzBCOLknM5c3KfwlTnGCP346RJr7csQJ_6vPcMstaCL4ZEBpMdw-Y-C-47RJodj9tonWe7S_HgIS4-mPXE1RzwyTqO6LxHEfZdcNEn2yL_donAF1mWldDl7tmskCYixfO9L6ACAmgzWL69S3dLiwtMbSolVscON-TwncFtOhRJ1hyKrR5sO_qW4Ln95CgjbgSYEsbcBFstnDIdjqOyFkLkqFYuOYDEG-_j2MeXgQPLPVC8_b4DR4L-WGjDto8f8dQkf2FjTziGCyu-zXxJJhdT9ZekpJjl6IvZKPnXTeKOTlSk9m6fxzsn1ijBa8GS280jOWMqw_eRJZd9dIRWUEgkx19asN39uw-pX-WkdBNAL5rBFSqG8Ztyg6dBiiK6msN7G6mf1OeIz2rBEFA4sMhcEysBSOzi3wdIXuQ8hCDtd6kVejdI2O2m8TFpLuWUywxA7eF6QgHo6IGmrCnvlQiMfS838wsK27Hhk2IjVP1FC7d2i1c_7vWQawpk3QpANk1qQV2hlKfKH5FDLbNczQOE53qdzadcKSU-bEXHjSy-B0rblT5mX-_kWaNRswv0","e":"AQAB"}]}'),
+			new Response(200, [], '{"issuer":"https://hotdoghouse24.cis.vut.cz/auth-server","authorization_endpoint":"https://test.id.vut.cz/auth/oauth2/authorize","token_endpoint":"https://test.id.vut.cz/auth/oauth2/token","userinfo_endpoint":"https://test.id.vut.cz/auth/oidc/userinfo","jwks_uri":"https://test.id.vut.cz/auth/.well-known/jwks.json","response_types_supported":["code"],"id_token_signing_alg_values_supported":["RS256"],"subject_types_supported":["pairwise"],"end_session_endpoint":"https://test.id.vut.cz/auth/oauth2/endSession","scopes_supported":["openid","profile","email"],"grant_types_supported":["authorization_code","refresh_token"],"frontchannel_logout_supported":true,"revocation_endpoint":"https://test.id.vut.cz/auth/common/oauth2/revoke"}'),
+			new Response(200, [], '{"keys":[{"alg":"RS256","kty":"RSA","kid":"dc5cd4215d6661ac281b489b2a5abb331010f690ffb8ca160fe8e09506c85915","use":"sig","n":"rw-DV64b5jOb1Q9cji1X9F5p5O9Ol7BfyPZKnRvihW3XYPifLKpWLgBQzi0pyoSQnA1loYiZNuXUWWNARluUWQywv9SQPJbmZYi3eQ2dfOXwvOGWl7v-veI4QkRPE6m69rm-kQ_6CaQr6R_vkiaL4nFPiOs8gDnvipmn7osGgP01KArXLsr7P7Xp_yfKNkonEa37oNxI8VZuHeWGAVh_wQGD5vpFCrRC08_8YAkFMwwG-PN-HuJqdFInMzQ9zckvaFtP5Kn9gUuNKwHFAI1Pf5lis5RLSkdKEPbym33WIUuqVjCnDeWSmnNf33IMHgJB6KeuxOATM2lvTuSObV9IXw","e":"AQAB"}]}'),
 		]);
 		$handlerStack = HandlerStack::create($mockHandler);
 
-		$signer = new \Lcobucci\JWT\Signer\Rsa\Sha256();
+		$this->signer = new Signer\Rsa\Sha256(); //$this->createMock(Signer::class);
 		$this->provider = new \Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectProvider(
 			[
 				'clientId' => '4c944b57-f951-47ea-88e6-b3d447feb29b',
-				'clientSecret' => 'abc123',
+				'clientSecret' => 'some clientSecret',
 				// Your server
-				'redirectUri' => 'http://localhost:8002/client.php',
+				'redirectUri' => 'some redirectUri',
 				'scopes' => [
 					'openid',
 					'email',
 					'profile',
 				],
-				'issuer' => 'https://test.id.vut.cz/auth',
+				'issuer' => 'https://hotdoghouse24.cis.vut.cz/auth-server',
 			],
 			[
-				'signer' => $signer,
+				'grantFactory' => $this->grantFactory,
+				'signer' => $this->signer,
 				'httpClient' => new Client(['handler' => $handlerStack]),
 			],
 		);
+
+		$this->signer = $this->createMock(Signer::class);
 	}
 
 	public function testAuthorizationUrl(): void
@@ -85,6 +128,22 @@ class VutProviderTest extends TestCase
 		$url = $this->provider->getResourceOwnerDetailsUrl($token);
 
 		self::assertEquals('https://test.id.vut.cz/auth/oidc/userinfo', $url);
+	}
+
+	/**
+	 * @throws IdentityProviderException
+	 */
+	public function testGetAccessToken(): void
+	{
+		$grant = $this->createMock(AbstractGrant::class);
+		$options = ['required-parameter' => 'some-value', 'nbfToleranceSeconds' => 60 * 60 * 60 * 1000];
+
+		// AbstractProvider::verifyGrant
+		$this->mockParentClassForAccessToken($grant, $options);
+
+		$this->provider->setNonce('VtjNtGCDYiXH2wy37QB9lqLFObRO03boZlH7IGnEa0lx3xKmU4R0dIriOBVZSB5l');
+		// OpenIDConnectProvider::getAccessToken
+		$this->provider->getAccessToken($grant, $options);
 	}
 
 	public function testUserData(): void
@@ -129,5 +188,50 @@ class VutProviderTest extends TestCase
 		return new AccessToken([
 			'access_token' => 'mock_access_token',
 		]);
+	}
+
+	/**
+	 * @throws \JsonException
+	 */
+	private function mockParentClassForAccessToken(MockObject $grant, array $options): void
+	{
+		$this->grantFactory
+			->expects(self::once())
+			->method('checkGrant')
+			->with(self::identicalTo($grant));
+
+		$params = [
+			'client_id' => '4c944b57-f951-47ea-88e6-b3d447feb29b',
+			'client_secret' => 'some clientSecret',
+			'redirect_uri' => 'some redirectUri',
+		];
+
+		$newParams = [
+			'client_id' => '4c944b57-f951-47ea-88e6-b3d447feb29b',
+			'client_secret' => 'some clientSecret',
+			'redirect_uri' => 'some redirectUri',
+			'grant_type' => 'authorization_code',
+		];
+
+		// AbstractProvider::getAccessToken
+		$grant
+			->expects(self::once())
+			->method('prepareRequestParameters')
+			->with(self::identicalTo($params), self::identicalTo($options))
+			->willReturn($newParams);
+
+		$responseBody = json_encode(
+			['access_token' => 'some access-token', 'id_token' => self::ID_TOKEN],
+			JSON_THROW_ON_ERROR,
+		);
+
+		$mockHandler = new MockHandler([
+			new Response(200, [], $responseBody)
+		]);
+		$handlerStack = HandlerStack::create($mockHandler);
+
+		$this->provider->setHttpClient(new Client(['handler' => $handlerStack]));
+
+		// AbstractProvider::getParsedResponse
 	}
 }

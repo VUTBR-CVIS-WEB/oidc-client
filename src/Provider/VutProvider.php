@@ -64,6 +64,7 @@ class VutProvider extends GenericProvider
 	/**
 	 * Get revoke token url to revoke token
 	 *
+	 * @param array<string, string|int> $params
 	 * @return string
 	 */
 	public function getBaseRevokeTokenUrl(array $params): ?string
@@ -112,11 +113,15 @@ class VutProvider extends GenericProvider
 		}
 
 		$urlParts = parse_url($this->urlEndSession);
+		if (!is_array($urlParts)) {
+			throw new \InvalidArgumentException('Incorrect end session url');
+		}
 		if (isset($urlParts['query'])) { // Avoid 'Undefined index: query'
 			parse_str($urlParts['query'], $query);
 		} else {
 			$query = [];
 		}
+
 		$query['client_id'] = $this->clientId;
 
 		if (!empty($params['post_logout_redirect_uri'])) {
@@ -126,6 +131,7 @@ class VutProvider extends GenericProvider
 		// Note that this will url_encode all values
 		$urlParts['query'] = http_build_query($query);
 
+		/** @phpstan-ignore-next-line */
 		return $urlParts['scheme'] . '://' . $urlParts['host'] . (($urlParts['port'] ?? false) ? (':' . $urlParts['host']) : '') . $urlParts['path'] . '?' . $urlParts['query'];
 	}
 
@@ -146,7 +152,6 @@ class VutProvider extends GenericProvider
 		$scopes = array_merge($this->getDefaultScopes(), $this->scopes);
 
 		if (!empty($options['scope'])) {
-			/** @phpstan-ignore-next-line */
 			$scopes = array_merge($scopes, $options['scope']);
 		}
 
