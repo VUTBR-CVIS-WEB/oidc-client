@@ -131,7 +131,7 @@ class VutProviderTest extends TestCase
 	}
 
 	/**
-	 * @throws JsonException
+	 * @throws IdentityProviderException
 	 */
 	public function testGetAccessToken(): void
 	{
@@ -191,7 +191,7 @@ class VutProviderTest extends TestCase
 	}
 
 	/**
-	 * @throws JsonException
+	 * @throws \JsonException
 	 */
 	private function mockParentClassForAccessToken(MockObject $grant, array $options): void
 	{
