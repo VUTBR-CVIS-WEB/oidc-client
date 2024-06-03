@@ -136,7 +136,7 @@ class VutProviderTest extends TestCase
 	public function testGetAccessToken(): void
 	{
 		$grant = $this->createMock(AbstractGrant::class);
-		$options = ['required-parameter' => 'some-value'];
+		$options = ['required-parameter' => 'some-value', 'nbfToleranceSeconds' => 60 * 60 * 60 * 1000];
 
 		// AbstractProvider::verifyGrant
 		$this->mockParentClassForAccessToken($grant, $options);

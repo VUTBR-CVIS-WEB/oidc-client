@@ -72,7 +72,6 @@ class VutOpenIDConnectProvider extends VutProvider
 			if (empty($collaborators['requestFactory'])) {
 				$collaborators['requestFactory'] = new RequestFactory();
 			}
-			/** @phpstan-ignore-next-line */
 			$this->setRequestFactory($collaborators['requestFactory']);
 
 			if (empty($collaborators['httpClient'])) {
@@ -82,7 +81,6 @@ class VutOpenIDConnectProvider extends VutProvider
 					array_intersect_key($options, array_flip($client_options))
 				);
 			}
-			/** @phpstan-ignore-next-line */
 			$this->setHttpClient($collaborators['httpClient']);
 
 			$options = $this->discoverConfiguration($options['issuer'], $options);
@@ -404,11 +402,11 @@ class VutOpenIDConnectProvider extends VutProvider
 	 * @param int $length Length of the random string to be generated.
 	 * @return string
 	 */
-	protected function getRandomNonce($length = 64)
+	protected function getRandomNonce(int $length = 64)
 	{
 		return substr(
 			strtr(
-				base64_encode(random_bytes($length)),
+				base64_encode(random_bytes(max(1, $length))),
 				'+/',
 				'-_'
 			),
@@ -454,11 +452,10 @@ class VutOpenIDConnectProvider extends VutProvider
 	private function constructKey(string $content): Key
 	{
 		if (strpos($content, 'file://') === 0) {
-			/** @phpstan-ignore-next-line */
 			return InMemory::file($content);
 		}
 
-		/** @phpstan-ignore-next-line */
+		assert(!empty($content));
 		return InMemory::plainText($content);
 	}
 }
