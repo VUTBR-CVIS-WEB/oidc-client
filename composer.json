@@ -33,7 +33,8 @@
     "phpstan/phpstan": "^1.8",
     "roave/security-advisories": "dev-latest",
     "spaze/phpstan-disallowed-calls": "^2.9",
-    "phpstan/phpstan-deprecation-rules": "^1.0"
+    "phpstan/phpstan-deprecation-rules": "^1.0",
+    "ext-json": "*"
   },
   "scripts": {
     "phpstan": "vendor/bin/phpstan --memory-limit=512M -vvv --ansi analyse --configuration phpstan.neon",
