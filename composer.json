@@ -23,7 +23,7 @@
   },
   "require": {
     "php": ">= 7.4",
-    "lcobucci/jwt": "~4.0|^5.2",
+    "lcobucci/jwt": "^4.3|^5.2",
     "phpseclib/phpseclib": "^3.0",
     "league/oauth2-client": "^2.0",
     "psr/cache": "^1.0|^3.0"
