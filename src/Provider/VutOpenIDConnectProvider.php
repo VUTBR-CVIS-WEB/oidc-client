@@ -196,10 +196,11 @@ class VutOpenIDConnectProvider extends VutProvider
 	 * Parse and validate logout token.
 	 *
 	 * @param string $logoutToken
+	 * @param array<string, mixed> $options
 	 * @return Token\Plain
 	 * @throws IdentityProviderException
 	 */
-	public function getLogoutToken(string $logoutToken): Token\Plain
+	public function getLogoutToken(string $logoutToken, array $options = []): Token\Plain
 	{
 		$token = (new Parser(new JoseEncoder()))->parse($logoutToken);
 

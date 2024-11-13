@@ -13,10 +13,10 @@ class HasSubOrSid implements Constraint
 	 */
 	public function assert(Token $token): void
 	{
-		$hasSub = $token->claims()->has('sub');
-		$hasSid = $token->claims()->has('sid');
+		/** @var Token\Plain $token */
+		$claims = $token->claims();
 
-		if (!$hasSub && !$hasSid) {
+		if (!$claims->has('sub') && !$claims->has('sid')) {
 			throw ConstraintViolation::error('The logout token must contain either a "sub" or "sid" claim.', $this);
 		}
 	}
