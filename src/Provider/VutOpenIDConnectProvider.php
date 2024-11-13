@@ -5,10 +5,12 @@ namespace Vut2\Component\OpenIDConnectClient\Provider;
 
 use GuzzleHttp\Client as HttpClient;
 use Lcobucci\Clock\SystemClock;
+use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer;
 use Lcobucci\JWT\Signer\Key;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Token;
+use Lcobucci\JWT\Token\Parser;
 use Lcobucci\JWT\Validation\Constraint\HasClaimWithValue;
 use Lcobucci\JWT\Validation\Constraint\IssuedBy;
 use Lcobucci\JWT\Validation\Constraint\PermittedFor;
@@ -23,6 +25,8 @@ use League\OAuth2\Client\Token\AccessToken;
 use League\OAuth2\Client\Token\AccessTokenInterface;
 use League\OAuth2\Client\Tool\RequestFactory;
 use Psr\Cache\CacheItemPoolInterface;
+use Vut2\Component\OpenIDConnectClient\Constraint\DoesNotHaveClaim;
+use Vut2\Component\OpenIDConnectClient\Constraint\HasSubOrSid;
 use Vut2\Component\OpenIDConnectClient\Constraint\NotEmpty;
 use Vut2\Component\OpenIDConnectClient\Exception\InvalidConfigurationException;
 use Vut2\Component\OpenIDConnectClient\Exception\InvalidTokenException;
@@ -186,6 +190,60 @@ class VutOpenIDConnectProvider extends VutProvider
 		}
 
 		return $accessToken;
+	}
+
+	/**
+	 * Parse and validate logout token.
+	 *
+	 * @param string $logoutToken
+	 * @return Token\Plain
+	 * @throws IdentityProviderException
+	 */
+	public function getLogoutToken(string $logoutToken): Token\Plain
+	{
+		$token = (new Parser(new JoseEncoder()))->parse($logoutToken);
+
+		$verified = false;
+		foreach ($this->getPublicKeys() as $key) {
+			if ($this->validateSignature($token, $key) !== false) {
+				$verified = true;
+				break;
+			}
+		}
+
+		if (!$verified) {
+			$message = 'Received an invalid logout_token from authorization server.';
+			throw new InvalidTokenException($message);
+		}
+
+		// validations
+		// @see http://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
+		$nbfToleranceSeconds = (isset($options['nbfToleranceSeconds']) && is_int($options['nbfToleranceSeconds'])) ? (int)$options['nbfToleranceSeconds'] : 0;
+
+		$expectedEvents = json_encode(["http://schemas.openid.net/event/backchannel-logout" => []]);
+		if ($expectedEvents === false) {
+			$message = 'Received an invalid logout_token from authorization server.';
+			throw new InvalidTokenException($message);
+		}
+
+		$constraints = [
+			new IssuedBy($this->getIdTokenIssuer()),
+			new PermittedFor($this->clientId),
+			new StrictValidAt(SystemClock::fromUTC(), new \DateInterval("PT{$nbfToleranceSeconds}S")),
+			new HasSubOrSid(), // A Logout Token MUST contain either a sub or a sid Claim, and MAY contain both.
+			new DoesNotHaveClaim('nonce'), // PROHIBITED. A nonce Claim MUST NOT be present.
+			new HasClaimWithValue('events', $expectedEvents)
+		];
+
+		try {
+			foreach ($constraints as $constraint) {
+				$constraint->assert($token);
+			}
+		} catch (ConstraintViolation $e) {
+			throw new InvalidTokenException('The logout_token did not pass validation. ' . $e->getMessage());
+		}
+
+		return $token;
 	}
 
 	/**
