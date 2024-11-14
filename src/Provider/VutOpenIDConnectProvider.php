@@ -197,10 +197,10 @@ class VutOpenIDConnectProvider extends VutProvider
 	 *
 	 * @param string $logoutToken
 	 * @param array<string, mixed> $options
-	 * @return Token\Plain
+	 * @return Token
 	 * @throws IdentityProviderException
 	 */
-	public function getLogoutToken(string $logoutToken, array $options = []): Token\Plain
+	public function getLogoutToken(string $logoutToken, array $options = []): Token
 	{
 		$token = (new Parser(new JoseEncoder()))->parse($logoutToken);
 
