@@ -429,7 +429,7 @@ class VutOpenIDConnectProvider extends VutProvider
 				if (isset($jwk['use']) && $jwk['use'] !== 'sig') {
 					return false;
 				}
-				if ($jwk['alg'] !== $this->signer->algorithmId()) {
+				if (isset($jwk['alg']) && $jwk['alg'] !== $this->signer->algorithmId()) {
 					return false;
 				}
 
