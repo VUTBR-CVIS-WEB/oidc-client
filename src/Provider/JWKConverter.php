@@ -27,7 +27,11 @@ class JWKConverter
 				throw new InvalidArgumentException('`multipleToPEM` can only take in an array of JWKs.');
 			}
 
-			$keys[] = $this->toPEM($jwk);
+			try {
+				$keys[] = $this->toPEM($jwk);
+			} catch (InvalidArgumentException $e) {
+				trigger_error($e->getMessage(), E_USER_WARNING);
+			}
 		}
 
 		return $keys;
@@ -45,12 +49,16 @@ class JWKConverter
 	 */
 	public function toPEM(array $jwk): string
 	{
-		if (!array_key_exists('e', $jwk) || !array_key_exists('n', $jwk) || !array_key_exists('kty', $jwk)) {
-			throw new InvalidArgumentException();
+		if (!array_key_exists('kty', $jwk)) {
+			throw new InvalidArgumentException('Missing key type.');
 		}
 
 		if ($jwk['kty'] != 'RSA') {
 			throw new InvalidArgumentException('RSA key type is currently only supported.');
+		}
+
+		if (!array_key_exists('e', $jwk) || !array_key_exists('n', $jwk) || !array_key_exists('kty', $jwk)) {
+			throw new InvalidArgumentException();
 		}
 
 		if (array_key_exists('d', $jwk)) {
