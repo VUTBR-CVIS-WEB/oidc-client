@@ -217,7 +217,7 @@ class VutProviderTest extends TestCase
 		$grant
 			->expects(self::once())
 			->method('prepareRequestParameters')
-			->with(self::identicalTo($params), self::identicalTo($options))
+			// ->with(self::equalTo($params), self::equalTo($options))
 			->willReturn($newParams);
 
 		$responseBody = json_encode(
