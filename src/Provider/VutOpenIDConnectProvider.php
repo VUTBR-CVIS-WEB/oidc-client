@@ -31,10 +31,11 @@ use Vut2\Component\OpenIDConnectClient\Constraint\NotEmpty;
 use Vut2\Component\OpenIDConnectClient\Exception\InvalidConfigurationException;
 use Vut2\Component\OpenIDConnectClient\Exception\InvalidTokenException;
 use Vut2\Component\OpenIDConnectClient\Flow\IdToken;
+use Vut2\Component\OpenIDConnectClient\Signer\RsaPss;
 
 class VutOpenIDConnectProvider extends VutProvider
 {
-	protected Signer $signer;
+	protected ?Signer $signer = null;
 
 	/** @var string|array<string> */
 	protected $publicKey;
@@ -50,10 +51,10 @@ class VutOpenIDConnectProvider extends VutProvider
 	 */
 	public function __construct(array $options = [], array $collaborators = [])
 	{
-		if (!$collaborators['signer'] instanceof Signer) {
+		if (isset($collaborators['signer']) && !$collaborators['signer'] instanceof Signer) {
 			throw new \InvalidArgumentException(sprintf('Signer must be instance of %s', Signer::class));
 		}
-		$this->signer = $collaborators['signer'];
+		$this->signer = $collaborators['signer'] ?? null;
 		if (isset($collaborators['cache'])) {
 			if (!$collaborators['cache'] instanceof CacheItemPoolInterface) {
 				throw new \InvalidArgumentException(sprintf('Cache must be instance of %s', CacheItemPoolInterface::class));
@@ -299,7 +300,7 @@ class VutOpenIDConnectProvider extends VutProvider
 	/**
 	 * @inheritDoc
 	 */
-	public function getResourceOwner(AccessToken $token)
+	public function getResourceOwner(AccessTokenInterface $token)
 	{
 		if ($token instanceof IdToken) {
 			return $this->createResourceOwner($token->getIdToken()->claims()->all(), $token);
@@ -478,7 +479,30 @@ class VutOpenIDConnectProvider extends VutProvider
 	{
 		$validator = new Validator();
 
-		return $validator->validate($token, new SignedWith($this->signer, $key));
+		$signer = $this->signer;
+		if (!$signer) {
+			$alg = $token->headers()->get('alg');
+
+			if (strpos($alg, 'RS') === 0) {
+				$signerType = Signer\Rsa::class;
+			} elseif (strpos($alg, 'ES') === 0) {
+				$signerType = Signer\Ecdsa::class;
+			} elseif (strpos($alg, 'HS') === 0) {
+				$signerType = Signer\Hmac::class;
+			} elseif (strpos($alg, 'PS') === 0) {
+				$signerType = RsaPss::class;
+			} else {
+				return false;
+			}
+
+			$signerClass = $signerType . substr($alg, 2);
+			if (!class_exists($signerClass) || !is_subclass_of($signerClass, Signer::class)) {
+				return false;
+			}
+			$signer = new $signerClass();
+		}
+
+		return $validator->validate($token, new SignedWith($signer, $key));
 	}
 
 	/**

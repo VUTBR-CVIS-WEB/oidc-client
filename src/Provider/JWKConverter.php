@@ -3,11 +3,19 @@
 namespace Vut2\Component\OpenIDConnectClient\Provider;
 
 use InvalidArgumentException;
+use phpseclib3\Crypt\Common\AsymmetricKey;
 use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Crypt\RSA\Formats\Keys\JWK;
 use phpseclib3\Math\BigInteger;
 
 class JWKConverter
 {
+	private const EC_CURVES = [
+		'P-256' => '1.2.840.10045.3.1.7', // Len: 64
+		'secp256k1' => '1.3.132.0.10', // Len: 64
+		'P-384' => '1.3.132.0.34', // Len: 96
+	];
+
 	/**
 	 * Converts multiple JSON Web Keys (JWKs) to PEM format.
 	 *
@@ -53,26 +61,10 @@ class JWKConverter
 			throw new InvalidArgumentException('Missing key type.');
 		}
 
-		if ($jwk['kty'] != 'RSA') {
-			throw new InvalidArgumentException('RSA key type is currently only supported.');
-		}
-
-		if (!array_key_exists('e', $jwk) || !array_key_exists('n', $jwk) || !array_key_exists('kty', $jwk)) {
-			throw new InvalidArgumentException();
-		}
-
 		if (array_key_exists('d', $jwk)) {
 			throw new InvalidArgumentException('Public key is currently only supported.');
 		}
 
-		$decodedE = base64_decode(strtr((string)$jwk['n'], '-_', '+/'), true);
-		if (!$decodedE) {
-			throw new \RuntimeException();
-		}
-
-		return PublicKeyLoader::load([
-			'e' => new BigInteger(base64_decode((string)$jwk['e']), 256),
-			'n' => new BigInteger($decodedE, 256)
-		]);
+		return PublicKeyLoader::load(json_encode($jwk, JSON_THROW_ON_ERROR));
 	}
 }

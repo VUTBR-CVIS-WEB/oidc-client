@@ -7,9 +7,6 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Lcobucci\JWT\Signer;
-use Lcobucci\JWT\Signer\Key;
-use Lcobucci\JWT\Token;
-use Lcobucci\JWT\Token\RegisteredClaims;
 use League\OAuth2\Client\Grant\AbstractGrant;
 use League\OAuth2\Client\Grant\GrantFactory;
 use League\OAuth2\Client\OptionProvider\PostAuthOptionProvider;
@@ -19,8 +16,6 @@ use League\OAuth2\Client\Token\AccessToken;
 use League\OAuth2\Client\Tool\RequestFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Psr\Http\Message\ResponseInterface;
-use Vut2\Component\OpenIDConnectClient\Exception\InvalidTokenException;
 use Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectProvider;
 
 class VutProviderTest extends TestCase
