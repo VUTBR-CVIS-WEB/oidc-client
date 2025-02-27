@@ -7,12 +7,14 @@ use GuzzleHttp\Client as HttpClient;
 use Lcobucci\Clock\SystemClock;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer;
+use Lcobucci\JWT\Signer\InvalidKeyProvided;
 use Lcobucci\JWT\Signer\Key;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Token;
 use Lcobucci\JWT\Token\Parser;
 use Lcobucci\JWT\Validation\Constraint\HasClaimWithValue;
 use Lcobucci\JWT\Validation\Constraint\IssuedBy;
+use Lcobucci\JWT\Validation\Constraint\LooseValidAt;
 use Lcobucci\JWT\Validation\Constraint\PermittedFor;
 use Lcobucci\JWT\Validation\Constraint\SignedWith;
 use Lcobucci\JWT\Validation\Constraint\StrictValidAt;
@@ -31,10 +33,11 @@ use Vut2\Component\OpenIDConnectClient\Constraint\NotEmpty;
 use Vut2\Component\OpenIDConnectClient\Exception\InvalidConfigurationException;
 use Vut2\Component\OpenIDConnectClient\Exception\InvalidTokenException;
 use Vut2\Component\OpenIDConnectClient\Flow\IdToken;
+use Vut2\Component\OpenIDConnectClient\Signer\RsaPss;
 
 class VutOpenIDConnectProvider extends VutProvider
 {
-	protected Signer $signer;
+	protected ?Signer $signer = null;
 
 	/** @var string|array<string> */
 	protected $publicKey;
@@ -50,10 +53,10 @@ class VutOpenIDConnectProvider extends VutProvider
 	 */
 	public function __construct(array $options = [], array $collaborators = [])
 	{
-		if (!$collaborators['signer'] instanceof Signer) {
+		if (isset($collaborators['signer']) && !$collaborators['signer'] instanceof Signer) {
 			throw new \InvalidArgumentException(sprintf('Signer must be instance of %s', Signer::class));
 		}
-		$this->signer = $collaborators['signer'];
+		$this->signer = $collaborators['signer'] ?? null;
 		if (isset($collaborators['cache'])) {
 			if (!$collaborators['cache'] instanceof CacheItemPoolInterface) {
 				throw new \InvalidArgumentException(sprintf('Cache must be instance of %s', CacheItemPoolInterface::class));
@@ -150,10 +153,20 @@ class VutOpenIDConnectProvider extends VutProvider
 		// The alg value SHOULD be the default of RS256 or the algorithm sent by the Client in the
 		// id_token_signed_response_alg parameter during Registration.
 		$verified = false;
-		foreach ($this->getPublicKeys() as $key) {
-			if ($this->validateSignature($token, $key) !== false) {
+		$kid = $token->headers()->get('kid');
+		$keys = $this->getPublicKeys();
+		$kidKey = $kid ? ($keys[$kid] ?? null) : $kid;
+
+		if ($kidKey) {
+			if ($this->validateSignature($token, $kidKey) !== false) {
 				$verified = true;
-				break;
+			}
+		} else {
+			foreach ($keys as $key) {
+				if ($this->validateSignature($token, $key) !== false) {
+					$verified = true;
+					break;
+				}
 			}
 		}
 
@@ -169,11 +182,19 @@ class VutOpenIDConnectProvider extends VutProvider
 		$constraints = [
 			new IssuedBy($this->getIdTokenIssuer()),
 			new PermittedFor($this->clientId),
-			new StrictValidAt(SystemClock::fromUTC(), new \DateInterval("PT{$nbfToleranceSeconds}S")),
 			// new HasClaimWithValue('auth_time', $currentTime),
 			new NotEmpty('sub'),
-			new HasClaimWithValue('nonce', $this->nonce),
 		];
+
+		if ($token->claims()->has('nbf')) {
+			$constraints[] = new StrictValidAt(SystemClock::fromUTC(), new \DateInterval("PT{$nbfToleranceSeconds}S"));
+		} else {
+			$constraints[] = new LooseValidAt(SystemClock::fromUTC(), new \DateInterval("PT{$nbfToleranceSeconds}S"));
+		}
+
+		if ($this->nonce) {
+			$constraints[] = new HasClaimWithValue('nonce', $this->nonce);
+		}
 
 		// If the ID Token contains multiple audiences, the Client SHOULD verify that an azp Claim is present.
 		// If an azp (authorized party) Claim is present, the Client SHOULD verify that its client_id is the Claim Value.
@@ -299,7 +320,7 @@ class VutOpenIDConnectProvider extends VutProvider
 	/**
 	 * @inheritDoc
 	 */
-	public function getResourceOwner(AccessToken $token)
+	public function getResourceOwner(AccessTokenInterface $token)
 	{
 		if ($token instanceof IdToken) {
 			return $this->createResourceOwner($token->getIdToken()->claims()->all(), $token);
@@ -429,7 +450,7 @@ class VutOpenIDConnectProvider extends VutProvider
 				if (isset($jwk['use']) && $jwk['use'] !== 'sig') {
 					return false;
 				}
-				if (isset($jwk['alg']) && $jwk['alg'] !== $this->signer->algorithmId()) {
+				if (isset($jwk['alg']) && $this->signer && $jwk['alg'] !== $this->signer->algorithmId()) {
 					return false;
 				}
 
@@ -478,7 +499,35 @@ class VutOpenIDConnectProvider extends VutProvider
 	{
 		$validator = new Validator();
 
-		return $validator->validate($token, new SignedWith($this->signer, $key));
+		$signer = $this->signer;
+		if (!$signer) {
+			$alg = $token->headers()->get('alg');
+
+			if (strpos($alg, 'RS') === 0) {
+				$signerType = Signer\Rsa::class;
+			} elseif (strpos($alg, 'ES') === 0) {
+				$signerType = Signer\Ecdsa::class;
+			} elseif (strpos($alg, 'HS') === 0) {
+				$signerType = Signer\Hmac::class;
+			} elseif (strpos($alg, 'PS') === 0) {
+				$signerType = RsaPss::class;
+			} else {
+				return false;
+			}
+
+			$signerClass = $signerType . '\\Sha' . substr($alg, 2);
+
+			if (!class_exists($signerClass) || !is_subclass_of($signerClass, Signer::class)) {
+				return false;
+			}
+			$signer = new $signerClass();
+		}
+
+		try {
+			return $validator->validate($token, new SignedWith($signer, $key));
+		} catch (InvalidKeyProvided $e) {
+			return false;
+		}
 	}
 
 	/**

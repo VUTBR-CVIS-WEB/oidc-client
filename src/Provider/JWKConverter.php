@@ -3,7 +3,9 @@
 namespace Vut2\Component\OpenIDConnectClient\Provider;
 
 use InvalidArgumentException;
+use phpseclib3\Crypt\Common\AsymmetricKey;
 use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Crypt\RSA\Formats\Keys\JWK;
 use phpseclib3\Math\BigInteger;
 
 class JWKConverter
@@ -28,7 +30,12 @@ class JWKConverter
 			}
 
 			try {
-				$keys[] = $this->toPEM($jwk);
+				$kid = $jwk['kid'] ?? null;
+				if ($kid) {
+					$keys[$kid] = $this->toPEM($jwk);
+				} else {
+					$keys[] = $this->toPEM($jwk);
+				}
 			} catch (InvalidArgumentException $e) {
 				trigger_error($e->getMessage(), E_USER_WARNING);
 			}
@@ -53,26 +60,10 @@ class JWKConverter
 			throw new InvalidArgumentException('Missing key type.');
 		}
 
-		if ($jwk['kty'] != 'RSA') {
-			throw new InvalidArgumentException('RSA key type is currently only supported.');
-		}
-
-		if (!array_key_exists('e', $jwk) || !array_key_exists('n', $jwk) || !array_key_exists('kty', $jwk)) {
-			throw new InvalidArgumentException();
-		}
-
 		if (array_key_exists('d', $jwk)) {
 			throw new InvalidArgumentException('Public key is currently only supported.');
 		}
 
-		$decodedE = base64_decode(strtr((string)$jwk['n'], '-_', '+/'), true);
-		if (!$decodedE) {
-			throw new \RuntimeException();
-		}
-
-		return PublicKeyLoader::load([
-			'e' => new BigInteger(base64_decode((string)$jwk['e']), 256),
-			'n' => new BigInteger($decodedE, 256)
-		]);
+		return PublicKeyLoader::load(json_encode($jwk, JSON_THROW_ON_ERROR));
 	}
 }
