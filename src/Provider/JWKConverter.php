@@ -10,12 +10,6 @@ use phpseclib3\Math\BigInteger;
 
 class JWKConverter
 {
-	private const EC_CURVES = [
-		'P-256' => '1.2.840.10045.3.1.7', // Len: 64
-		'secp256k1' => '1.3.132.0.10', // Len: 64
-		'P-384' => '1.3.132.0.34', // Len: 96
-	];
-
 	/**
 	 * Converts multiple JSON Web Keys (JWKs) to PEM format.
 	 *
