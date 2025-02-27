@@ -17,6 +17,7 @@ use League\OAuth2\Client\Tool\RequestFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Vut2\Component\OpenIDConnectClient\Exception\InvalidTokenException;
+use Vut2\Component\OpenIDConnectClient\Flow\IdToken;
 use Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectProvider;
 
 class VutOpenIDConnectProviderTest extends TestCase
@@ -49,7 +50,7 @@ class VutOpenIDConnectProviderTest extends TestCase
 
 		$this->provider = new \Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectProvider(
 			[
-				'clientId' => '4c944b57-f951-47ea-88e6-b3d447feb29b',
+				'clientId' => '21d0c527-3aa4-41a9-b5f7-97e2dbcfa08a',
 				'clientSecret' => 'some clientSecret',
 				// Your server
 				'redirectUri' => 'some redirectUri',
@@ -77,11 +78,12 @@ class VutOpenIDConnectProviderTest extends TestCase
 
 		$this->mockParentClassForAccessToken($grant, $options, self::ID_TOKEN);
 
-		$this->provider->setNonce('VtjNtGCDYiXH2wy37QB9lqLFObRO03boZlH7IGnEa0lx3xKmU4R0dIriOBVZSB5l');
 		// OpenIDConnectProvider::getAccessToken
-		$this->provider->getAccessToken($grant, $options);
-	}
+		$token = $this->provider->getAccessToken($grant, $options);
 
+		$this->assertTrue($token instanceof IdToken);
+		$this->assertEquals(self::ID_TOKEN, (string)$token->getIdToken()->toString());
+	}
 
 	/**
 	 * @throws IdentityProviderException

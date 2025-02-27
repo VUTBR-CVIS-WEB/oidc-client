@@ -30,7 +30,12 @@ class JWKConverter
 			}
 
 			try {
-				$keys[] = $this->toPEM($jwk);
+				$kid = $jwk['kid'] ?? null;
+				if ($kid) {
+					$keys[$kid] = $this->toPEM($jwk);
+				} else {
+					$keys[] = $this->toPEM($jwk);
+				}
 			} catch (InvalidArgumentException $e) {
 				trigger_error($e->getMessage(), E_USER_WARNING);
 			}
