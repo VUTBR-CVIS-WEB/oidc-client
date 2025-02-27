@@ -16,12 +16,15 @@ use League\OAuth2\Client\Token\AccessToken;
 use League\OAuth2\Client\Tool\RequestFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Vut2\Component\OpenIDConnectClient\Exception\InvalidTokenException;
 use Vut2\Component\OpenIDConnectClient\Provider\VutOpenIDConnectProvider;
 
 class VutOpenIDConnectProviderTest extends TestCase
 {
 	// phpcs:ignore Generic.Files.LineLength.TooLong
-	private const ID_TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImRjNWNkNDIxNWQ2NjYxYWMyODFiNDg5YjJhNWFiYjMzMTAxMGY2OTBmZmI4Y2ExNjBmZThlMDk1MDZjODU5MTUifQ.eyJhdWQiOiI0Yzk0NGI1Ny1mOTUxLTQ3ZWEtODhlNi1iM2Q0NDdmZWIyOWIiLCJpYXQiOjE3MTc0MTYyNjQsIm5iZiI6MTcxNzQxNjI2NCwiZXhwIjoxNzE3NDE5ODYzLCJzdWIiOiIxOTYyMzMiLCJpc3MiOiJodHRwczovL2hvdGRvZ2hvdXNlMjQuY2lzLnZ1dC5jei9hdXRoLXNlcnZlciIsInNpZCI6IjhiMjAyNWI4ZGMzYmE3MzFjZTQxMjJlMWU0YmNjMWY3NTNiYjQzZDFhNjNiYmM1YWYyNTU0MzEyZDJkMGI5ODAtNTc4IiwibmFtZSI6IkluZy4gUGF2ZWwgV2l0YXNzZWsiLCJmYW1pbHlfbmFtZSI6IldpdGFzc2VrIiwiZ2l2ZW5fbmFtZSI6IlBhdmVsIiwibWlkZGxlX25hbWUiOm51bGwsInByb2ZpbGUiOiJodHRwczovL3d3dy52dXQuY3ovbGlkZS8xOTYyMzMiLCJ3ZWJzaXRlIjpudWxsLCJnZW5kZXIiOiJtYWxlIiwiYmlydGhkYXRlIjoiMTk5NS0xMC0wNSIsImxvY2FsZSI6ImNzLUNaIiwidXBkYXRlZF9hdCI6MTY5Nzc2NjM1MSwiYXV0aF90aW1lIjoxNzE3NDE2MjYyLCJub25jZSI6IlZ0ak50R0NEWWlYSDJ3eTM3UUI5bHFMRk9iUk8wM2JvWmxIN0lHbkVhMGx4M3hLbVU0UjBkSXJpT0JWWlNCNWwiLCJqdGkiOiIzNjdlYzVhZWI2ODMyZGUwMzI2OGRjNjU4ZjQ2N2E4Njg4NGUxMTYwNTliNDc4YzMwYjU0OWM2MTkyZmFkNDk1YmYzMWE4ZWQ2MDM0ZmU2MSJ9.KQMC79Y7GVwoR9SrSEi4GB3Ojc2JgW7BA2K22_1BEG9hzuxhxKrL70bBtC1gj1e-7aZwwqPyKIJ9sen5xYmgzAN7Q8dcxq2xegDxzZhO9WJptzqt9R4Ii74dxEdi-0X7kQzfvydCbB6WejUPsjAHyF9QzxP_jw2ZpLEO7GHAOxU4AWv6xXtT1PhI6z3NTDjcm0R3le4kWFOtc4GiSmW4UvABB-rAUAkVh9uxfYSxM4pPqSMY9iyCuYpXEhuuXGMOU94XtJyEifKiWCnPvdl17y9Dxx8AtYyBsE5YCLGEl5RykuFz1SS_el-lQmv326YLyhCqzwPKmp1gEBlxS_F0tQ';
+	private const BAD_ID_TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImRjNWNkNDIxNWQ2NjYxYWMyODFiNDg5YjJhNWFiYjMzMTAxMGY2OTBmZmI4Y2ExNjBmZThlMDk1MDZjODU5MTUifQ.eyJhdWQiOiI0Yzk0NGI1Ny1mOTUxLTQ3ZWEtODhlNi1iM2Q0NDdmZWIyOWIiLCJpYXQiOjE3MTc0MTYyNjQsIm5iZiI6MTcxNzQxNjI2NCwiZXhwIjoxNzE3NDE5ODYzLCJzdWIiOiIxOTYyMzMiLCJpc3MiOiJodHRwczovL2hvdGRvZ2hvdXNlMjQuY2lzLnZ1dC5jei9hdXRoLXNlcnZlciIsInNpZCI6IjhiMjAyNWI4ZGMzYmE3MzFjZTQxMjJlMWU0YmNjMWY3NTNiYjQzZDFhNjNiYmM1YWYyNTU0MzEyZDJkMGI5ODAtNTc4IiwibmFtZSI6IkluZy4gUGF2ZWwgV2l0YXNzZWsiLCJmYW1pbHlfbmFtZSI6IldpdGFzc2VrIiwiZ2l2ZW5fbmFtZSI6IlBhdmVsIiwibWlkZGxlX25hbWUiOm51bGwsInByb2ZpbGUiOiJodHRwczovL3d3dy52dXQuY3ovbGlkZS8xOTYyMzMiLCJ3ZWJzaXRlIjpudWxsLCJnZW5kZXIiOiJtYWxlIiwiYmlydGhkYXRlIjoiMTk5NS0xMC0wNSIsImxvY2FsZSI6ImNzLUNaIiwidXBkYXRlZF9hdCI6MTY5Nzc2NjM1MSwiYXV0aF90aW1lIjoxNzE3NDE2MjYyLCJub25jZSI6IlZ0ak50R0NEWWlYSDJ3eTM3UUI5bHFMRk9iUk8wM2JvWmxIN0lHbkVhMGx4M3hLbVU0UjBkSXJpT0JWWlNCNWwiLCJqdGkiOiIzNjdlYzVhZWI2ODMyZGUwMzI2OGRjNjU4ZjQ2N2E4Njg4NGUxMTYwNTliNDc4YzMwYjU0OWM2MTkyZmFkNDk1YmYzMWE4ZWQ2MDM0ZmU2MSJ9.KQMC79Y7GVwoR9SrSEi4GB3Ojc2JgW7BA2K22_1BEG9hzuxhxKrL70bBtC1gj1e-7aZwwqPyKIJ9sen5xYmgzAN7Q8dcxq2xegDxzZhO9WJptzqt9R4Ii74dxEdi-0X7kQzfvydCbB6WejUPsjAHyF9QzxP_jw2ZpLEO7GHAOxU4AWv6xXtT1PhI6z3NTDjcm0R3le4kWFOtc4GiSmW4UvABB-rAUAkVh9uxfYSxM4pPqSMY9iyCuYpXEhuuXGMOU94XtJyEifKiWCnPvdl17y9Dxx8AtYyBsE5YCLGEl5RykuFz1SS_el-lQmv326YLyhCqzwPKmp1gEBlxS_F0tQ';
+	// phpcs:ignore Generic.Files.LineLength.TooLong
+	private const ID_TOKEN = 'eyJraWQiOiIqcnAtc2lnbiNlOTA3ODljYS05ODE0LTQ0ZTgtOGRiZS1lNzJjYmEyZGIyYjgiLCJhbGciOiJQUzUxMiJ9.eyJhY3IiOiJsb2EzIiwic3ViIjoiMzg0ODViNWYtMjE5NC00Y2UzLThhODktOGE3OTE1MzZhMTAzIiwiYXVkIjoiMjFkMGM1MjctM2FhNC00MWE5LWI1ZjctOTdlMmRiY2ZhMDhhIiwiYmFua19pZCI6IjMxNzU0NzJlLWFhNzQtNGFhNy05MzQxLTNkMzI0ZjBhNDhhMiIsImF1dGhfdGltZSI6MTc0MDQ2NzExMCwiYW1yIjpbIm1mYSIsIm90cCJdLCJpc3MiOiJodHRwczovL29pZGMuc2FuZGJveC5iYW5raWQuY3ovIiwiZXhwIjoxNzQwNDY3NzI4LCJpYXQiOjE3NDA0NjcxMjgsIm5vbmNlIjoiMDgwYmE3ZjUtMDJjNS00YWZkLWFhNWItNTdiMDg2MGZkNjczIiwianRpIjoiNzhhOWQzNGEtNjZlOS00Y2M0LWJjZGQtNDRmNjAyZmJkM2NjIn0.HzranHfzPhfVNCh2meJck5sc_xFuLTrEUszkonqq6kdWxCdFE-6oM8vL3FZoXIp4LR_8aF_mzff5jIhil0PnIKgJrmQbeGobVPTy7RyybLYE6y6RHZTCAwv8uuEEfmkX74Z0uutOHvxVfK1kQ8DVhvFTiWVpr4ZKTjZO9iYW37G_a6rU0vRg5Je2Vnp7wdY2xzstwPyk1-j6VvPM0sNYCUI63lQnkwOcyJKEkmccOzjOxpvv-igwqNCSgYSAbwMCeOGyGO5Jy8aCG9eE-U8D7PrYU6a1kzJyRRfy0wiR6TAR9YX5ZY01sNemQLBp6W9HJS8VnkkCS29dFEtpb2YlBe-93kAjVhTYBL7RYWGRKCfXrcNmSYDDS_POo6YgZDHqm8Q8gbenneox28gsFrmNpqXaaPsxK7KsJBA2KQNG613JY4SpIrjanJy5pF15DLw_ULM6rrOuq-Q69w0o9XU2rPB1jzcBPP3k-WlTR1nkynTJgpvxHVvuEXiRMqJCZBkBirPjK-KySFTf4gTxlVHr-O3vSA7OnrKY9mpO4UC6vV-DGRZGjAPApCYIilxjxjy8LqPyMdRsHvga3h8iVgsvP7Wh0E5V0o4B8TSl7HYYzWLqvADJoLKpMxN6Ei_onG-DINWXaij-rgxVqzoJRzvCUD_k76oDa2i7v6q5CcezeoI';
 
 	/** @var VutOpenIDConnectProvider */
 	protected $provider;
@@ -72,7 +75,7 @@ class VutOpenIDConnectProviderTest extends TestCase
 		$grant = $this->createMock(AbstractGrant::class);
 		$options = ['required-parameter' => 'some-value', 'nbfToleranceSeconds' => 60 * 60 * 60 * 1000];
 
-		$this->mockParentClassForAccessToken($grant, $options);
+		$this->mockParentClassForAccessToken($grant, $options, self::ID_TOKEN);
 
 		$this->provider->setNonce('VtjNtGCDYiXH2wy37QB9lqLFObRO03boZlH7IGnEa0lx3xKmU4R0dIriOBVZSB5l');
 		// OpenIDConnectProvider::getAccessToken
@@ -81,9 +84,26 @@ class VutOpenIDConnectProviderTest extends TestCase
 
 
 	/**
+	 * @throws IdentityProviderException
+	 */
+	public function testGetAccessTokenInvalid(): void
+	{
+		$this->expectException(InvalidTokenException::class);
+
+		$grant = $this->createMock(AbstractGrant::class);
+		$options = ['required-parameter' => 'some-value', 'nbfToleranceSeconds' => 60 * 60 * 60 * 1000];
+
+		$this->mockParentClassForAccessToken($grant, $options, self::BAD_ID_TOKEN);
+
+		$this->provider->setNonce('VtjNtGCDYiXH2wy37QB9lqLFObRO03boZlH7IGnEa0lx3xKmU4R0dIriOBVZSB5l');
+		// OpenIDConnectProvider::getAccessToken
+		$this->provider->getAccessToken($grant, $options);
+	}
+
+	/**
 	 * @throws \JsonException
 	 */
-	private function mockParentClassForAccessToken(MockObject $grant, array $options): void
+	private function mockParentClassForAccessToken(MockObject $grant, array $options, string $idToken): void
 	{
 		$newParams = [
 			'client_id' => '4c944b57-f951-47ea-88e6-b3d447feb29b',
@@ -99,7 +119,7 @@ class VutOpenIDConnectProviderTest extends TestCase
 			->willReturn($newParams);
 
 		$responseBody = json_encode(
-			['access_token' => 'some access-token', 'id_token' => self::ID_TOKEN],
+			['access_token' => 'some access-token', 'id_token' => $idToken],
 			JSON_THROW_ON_ERROR,
 		);
 
