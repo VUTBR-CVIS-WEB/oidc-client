@@ -397,7 +397,7 @@ class VutOpenIDConnectProvider extends VutProvider
 				}
 			}
 
-			$options[$optionKey] = $response[$responseKey['name']];
+			$options[$optionKey] ??= $response[$responseKey['name']];
 		}
 
 		if ($this->cache && !$cachedResponse->isHit()) {
